@@ -1,0 +1,87 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:		th
+# Required-Start:	$remote_fs $syslog
+# Required-Stop:	$remote_fs $syslog
+# Default-Start:	2 3 4 5
+# Default-Stop:		1
+# Short-Description:	Temperature and Humidity Monitoring Daemon
+### END INIT INFO
+
+set -e
+
+DAEMON="/usr/sbin/th"
+NAME="th"
+PATH="/sbin:/bin:/usr/sbin:/usr/bin"
+LOGFILE="/var/log/th.log"
+
+test -x "${DAEMON}" || exit 0
+
+if [ ! -e "${LOGFILE}" ]
+then
+	touch "${LOGFILE}"
+	chmod 640 "${LOGFILE}"
+	chown root:adm "${LOGFILE}"
+fi
+
+
+case "${1}" in
+	start)
+		echo -n "Starting Temperature and Humidity Monitoring Daemon: "
+
+                start-stop-daemon --start --background -m --oknodo --pidfile /var/run/th.pid --startas /bin/bash -- -c "exec ${DAEMON} >> ${LOGFILE}"		
+
+		echo "${NAME}."
+		;;
+
+	stop)
+		echo -n "Stopping Temperature and Humidity Monitoring Daemon: "
+
+		start-stop-daemon --stop --pidfile /var/run/th.pid --oknodo --exec ${DAEMON}
+		rm -f /var/run/th.pid
+
+		echo "${NAME}."
+
+		;;
+
+	restart)
+		echo -n "Stopping Temperature and Humidity Monitoring Daemon: "
+
+		start-stop-daemon --stop --pidfile /var/run/th.pid --oknodo --exec ${DAEMON}
+		rm -f /var/run/th.pid
+
+		echo "${NAME}."
+		echo -n "Starting Temperature and Humidity Monitoring Daemon: "
+
+                start-stop-daemon --start --background -m --oknodo --pidfile /var/run/th.pid --startas /bin/bash -- -c "exec ${DAEMON} >> ${LOGFILE}"
+
+		echo "${NAME}."
+		;;
+
+	status)
+		PID="$(cat /var/run/th.pid 2>/dev/null)" || true
+
+		if [ ! -f /var/run/th.pid ] || [ -z "${PID}" ]
+		then
+			echo "${NAME} is not running"
+			exit 3
+		fi
+
+		if ps "${PID}" >/dev/null 2>&1
+		then
+			echo "${NAME} is running"
+			exit 0
+		else
+			echo "${NAME} is not running"
+			exit 1
+		fi
+		;;
+
+	*)
+		echo "Usage: /etc/init.d/${NAME} {start|stop|restart|status}"
+		exit 1
+		;;
+esac
+
+exit 0
