@@ -1,0 +1,68 @@
+<html>
+  <head>
+    <!--Load the AJAX API-->
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script type="text/javascript">
+    
+    // Load the Visualization API and the piechart package.
+    google.load('visualization', '1.1', {'packages':['corechart']});
+      
+    // Set a callback to run when the Google Visualization API is loaded.
+    google.setOnLoadCallback(drawChart);
+      
+    function drawChart() {
+      var jsonData = $.ajax({
+        url: "getData.php",
+        dataType:"json",
+        async: false
+        }).responseText;
+          
+      // Create our data table out of JSON data loaded from server.
+      var data = new google.visualization.DataTable(jsonData);
+
+      // Instantiate and draw our chart, passing in some options.
+      var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+     
+      // assumes you have timestamps in column 0, and two data series (columns 1 and 2)
+      var view = new google.visualization.DataView(data);
+      view.setColumns([{
+        type: 'datetime',
+        label: data.getColumnLabel(0),
+        calc: function (dt, row) {
+          var timestamp = dt.getValue(row, 0) * 1000; // convert to milliseconds
+          return new Date(timestamp);
+        }
+      }, 1, 2]);
+
+      var options = {
+        title: 'Temperature and Relative Humidity over Time',      	
+        width: 900,
+        height: 500,
+        vAxis: {title: "Temperature (C) and Humidity (%)"},
+        hAxis: {title: "Date and Time"},
+//        chartArea: {'width': '100%', 'height': '80%'},
+      }  
+
+      chart.draw(view, options);
+    }
+
+    </script>
+
+    <script type="text/javascript" src="jQuery.js"></script>
+    <script type="text/javascript">
+      $(document).ready(function(){
+        // First load the chart once 
+        drawChart();
+        // Set interval to call the drawChart again
+        setInterval(drawChart, 60000);
+      });
+    </script>
+
+  </head>
+
+  <body>
+    <!--Div that will hold the line chart-->
+    <div id="chart_div"></div>
+  </body>
+</html>
