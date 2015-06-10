@@ -1,6 +1,6 @@
 /*
  * th.c  capture Temperature and Humidity readings, write them to sql database
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *      https://projects.drogon.net/raspberry-pi/wiringpi/
 
 rev 1.0 12/01/2013 WPNS built from Gordon Hendersen's rht03.c
 rev 1.1 12/01/2013 WPNS don't retry, takes too long
@@ -11,7 +11,8 @@ rev 1.5 12/01/2013 WPNS do 60 second cycle, cleanup, trial run
 rev 1.6 12/01/2013 WPNS clean up output format
 rev 1.7 12/02/2013 WPNS allow more retries, minor cleanups
 rev 1.79 12/04/2013 WPNS release to instructables
-rev 1.80 03/06/2015 JDE Added code to drop entries if more than 10C difference calculated.
+rev 1.8 01/06/2015 JDE updated code to try and drop anomolous temperature humidity readings before hitting the database
+rev 1.9 04/06/2015 JDE updated to try and read MySQL configuration from /etc/th.conf file rather than hard coding it
 
  */
 
@@ -21,9 +22,11 @@ rev 1.80 03/06/2015 JDE Added code to drop entries if more than 10C difference c
 #include <maxdetect.h>
 #include <time.h>
 
+#include <libconfig.h>
+
 #include <mysql/mysql.h>
 
-#define	RHT03_PIN	7
+#define RHT03_PIN       7
 #define CYCLETIME      60
 #define RETRIES         3
 
@@ -34,101 +37,178 @@ void finish_with_error(MYSQL *con)
   exit(1);
 }
 
-/*
- ***********************************************************************
- * The main program
- ***********************************************************************
- */
-
-int main (void)
+int main()
 {
-  int temp, rh, oldtemp, difftemp ;       // temperature and relative humidity readings
-  int loop;                               // how many times through the loop?
-  time_t oldtime,newtime;                 // when did we last take a reading?
-  //  int deltime;                   // how many seconds ago was that?
+    config_t cfg;               /*Returns all parameters in this structure */
+    config_setting_t *setting;
+    const char *str1, *sqlServer, *databaseName, *username, *password;
 
-  char SQLstring[64];                     // string to send to SQL engine
-  char TimeString[64];                    // formatted time
-  time_t rawtime;
-  struct tm * timeinfo;
+    char *config_file_name = "/etc/th.conf";
 
-  int status;                             // how did the read go?
+    int temp, rh, oldtemp, difftemp ;       // temperature and relative humidity readings
+    int loop;                               // how many times through the loop?
+    time_t oldtime,newtime;                 // when did we last take a reading?
 
-  temp = rh = loop = 0 ;
-  oldtime = (int)time(NULL);
+    char SQLstring[64];                     // string to send to SQL engine
+    char TimeString[64];                    // formatted time
+    time_t rawtime;
+    struct tm * timeinfo;
 
-  wiringPiSetup () ;
-  piHiPri       (55) ;
+    int status;                             // how did the read go?
 
-  printf("rh.c rev 1.79 12/04/2013 WPNS %sCycle time: %i seconds, %i retries\n",ctime(&oldtime),CYCLETIME,RETRIES);
-  fflush(stdout);
+    /*Initialization */
+    config_init(&cfg);
 
-  MYSQL *con = mysql_init(NULL);
-
-  if (con == NULL) finish_with_error(con);
-
-  if (mysql_real_connect(con, "localhost", "USERNAME", "PASSWORD", 
-			 "Monitoring", 0, NULL, 0) == NULL) finish_with_error(con);
-
-  // wait for an interval to start and end
-  printf("Sync to cycletime...");
-  fflush(stdout);
-  while ((((int)time(NULL))%CYCLETIME)) delay(100);
-  oldtime = (int)time(NULL);
-  oldtemp = 500;
-  while (!(((int)time(NULL))%CYCLETIME)) delay(100);
-  printf("\n");
-  fflush(stdout);
-
-  for (;;)
+    /* Read the file. If there is an error, report it and exit. */
+    if (!config_read_file(&cfg, config_file_name))
     {
-      // wait for an interval to start
-      while ((((int)time(NULL))%CYCLETIME)) delay(100);
+        printf("\n%s:%d - %s", config_error_file(&cfg), config_error_line(&cfg), config_error_text(&cfg));
+        config_destroy(&cfg);
+        return -1;
+    }
 
-/*****************************************************************/
+    /* Get the configuration file name. */
+    if (config_lookup_string(&cfg, "filename", &str1))
+        printf("\nFile Type: %s", str1);
+    else
+        printf("\nNo 'filename' setting in configuration file.");
 
-      // read new data
-      temp = rh = -1;
-      loop=RETRIES;
+    /*Read the parameter group*/
+    setting = config_lookup(&cfg, "params");
+    if (setting != NULL)
+    {
+        /*Read the server*/
+        if (config_setting_lookup_string(setting, "sqlServer", &sqlServer))
+        {
+            printf("\nMySQL Server to use: %s", sqlServer);
+        }
+        else
+            printf("\nNo 'sqlServer' setting in configuration file.");
 
-      status = readRHT03 (RHT03_PIN, &temp, &rh);
-      while ((!status) && loop--)
-	{
-	  printf("-Retry-");
-	  fflush(stdout);
-	  delay(3000);
-	  status = readRHT03 (RHT03_PIN, &temp, &rh);
-	}
+        /*Read the database*/
+        if (config_setting_lookup_string(setting, "databaseName", &databaseName))
+        {
+            printf("\nMySQL database to use: %s", databaseName);
+        }
+        else
+            printf("\nNo 'datbaseName' setting in configuration file.");
 
-      newtime = (int)time(NULL);
-      //      deltime = newtime-oldtime;
-      time(&rawtime);
-      timeinfo = localtime (&rawtime);
-      strftime (TimeString,64,"%F %T",timeinfo);
+        /*Read the username*/
+        if (config_setting_lookup_string(setting, "username", &username))
+        {
+            printf("\nMySQL username to use: %s", username);
+        }
+        else
+            printf("\nNo 'username' setting in configuration file.");
 
-      printf ("%s  Temp: %5.1f, RH: %5.1f%%\n", TimeString, temp / 10.0, rh / 10.0) ;
-      fflush(stdout);
-      oldtime = newtime;
-      difftemp = temp - oldtemp;
+        /*Read the password*/
+        if (config_setting_lookup_string(setting, "password", &password))
+        {
+            printf("\nMySQL password to use: %s", password);
+        }
+        else
+            printf("\nNo 'password' setting in configuration file.");
 
-      printf("Current Temp: %5.1f, Previous Temp: %5.1f, Temperature Difference: %5.1fC\n",(temp / 10.0),(oldtemp / 10.0),(difftemp / 10.0)) ;
-      // The line above is really for debugging - it notes the temperature difference between the current and previous readings.
-      // The readings are not added to the database if there is more than 10C between readings.
-      if (temp > oldtemp && difftemp > 100) {
+        printf("\n");
+    }
+
+/*    config_destroy(&cfg); */
+
+    /*MYSQL *con = mysql_init(NULL);
+    if (con == NULL) finish_with_error(con);
+    if (mysql_real_connect(con, sqlServer, username, password, databaseName, 0, NULL, 0) == NULL) finish_with_error(con);
+    sprintf(SQLstring,"SELECT ComputerTime, Temperature, Humidity FROM TempHumid ORDER BY id DESC LIMIT 1");
+    if (mysql_query(con, SQLstring)) finish_with_error(con);
+    MYSQL_RES *result = mysql_store_result(con);
+    if (result == NULL)
+    {
+        finish_with_error(con);
+    }
+
+    int num_fields = mysql_num_fields(result);
+    MYSQL_ROW row;
+
+    row = mysql_fetch_row(result);
+    for(int i = 0; i < num_fields; i++)
+    {
+          printf("%s ", row[i] ? row[i] : "NULL");
+    }
+    printf("\n"); */
+
+    /* THIS IS WHERE THE Temperautre humidity monitoring Code starts - really untidy and needs tidying up */
+
+    temp = rh = loop = 0 ;
+    oldtime = (int)time(NULL);
+
+    wiringPiSetup () ;
+    piHiPri       (55) ;
+
+    printf("th.c rev 1.9 04/06/2015 JDE %sCycle time: %i seconds, %i retries\n",ctime(&oldtime),CYCLETIME,RETRIES);
+    fflush(stdout);
+
+    MYSQL *con = mysql_init(NULL);
+
+    if (con == NULL) finish_with_error(con);
+
+    if (mysql_real_connect(con, sqlServer, username, password, databaseName, 0, NULL, 0) == NULL) finish_with_error(con);
+
+    // wait for an interval to start and end
+    printf("Sync to cycletime...");
+    fflush(stdout);
+    while ((((int)time(NULL))%CYCLETIME)) delay(100);
+    oldtime = (int)time(NULL);
+    oldtemp = 500;
+    while (!(((int)time(NULL))%CYCLETIME)) delay(100);
+    printf("\n");
+    fflush(stdout);
+
+    for (;;)
+    {
+        // wait for an interval to start
+        while ((((int)time(NULL))%CYCLETIME)) delay(100);
+
+    /*****************************************************************/
+
+        // read new data
+        temp = rh = -1;
+        loop=RETRIES;
+
+        status = readRHT03 (RHT03_PIN, &temp, &rh);
+        while ((!status) && loop--)
+        {
+            printf("-Retry-");
+            fflush(stdout);
+            delay(3000);
+            status = readRHT03 (RHT03_PIN, &temp, &rh);
+        }
+
+        newtime = (int)time(NULL);
+        //      deltime = newtime-oldtime;
+        time(&rawtime);
+        timeinfo = localtime (&rawtime);
+        strftime (TimeString,64,"%F %T",timeinfo);
+
+        fflush(stdout);
+        oldtime = newtime;
+        difftemp = temp - oldtemp;
+
+        printf("Current Temp: %5.1f, Previous Temp: %5.1f, Temperature Difference: %5.1fC\n",(temp / 10.0),(oldtemp / 10.0),(difftemp / 10.0)) ;
+        if (temp > oldtemp && difftemp > 100) {
             printf("Damn ... the sensor returned a bad reading!\n");
-      }
-      else {
+        }
+        else {
             sprintf(SQLstring,"INSERT INTO TempHumid VALUES(unix_timestamp(now()),%5.1f,%5.1f,NULL)",(temp / 10.0),(rh / 10.0));
             if (mysql_query(con, SQLstring)) finish_with_error(con);
             oldtemp = temp;
-      }
+        }
 
-/*****************************************************************/
+        /*****************************************************************/
 
-      // wait for the rest of that interval to finish
-      while (!(((int)time(NULL))%CYCLETIME)) delay(100);
-
+        // wait for the rest of that interval to finish
+        while (!(((int)time(NULL))%CYCLETIME)) delay(100);
     }
-  
-  return 0 ;
+
+    return 0 ;
+
+    config_destroy(&cfg);
 }
