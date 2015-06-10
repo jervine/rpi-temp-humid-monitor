@@ -29,8 +29,8 @@ fi
 case "${1}" in
 	start)
 		echo -n "Starting Temperature and Humidity Monitoring Daemon: "
-
-                start-stop-daemon --start --background -m --oknodo --pidfile /var/run/th.pid --startas /bin/bash -- -c "exec ${DAEMON} >> ${LOGFILE}"		
+                sleep 10 # We need to wait until mysqld has started - this is a horrible workaround for now
+                start-stop-daemon --start --background -m --oknodo --pidfile /var/run/th.pid --startas /bin/bash -- -c "exec ${DAEMON} >> ${LOGFILE} 2>&1"		
 
 		echo "${NAME}."
 		;;
