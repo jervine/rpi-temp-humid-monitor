@@ -27,9 +27,9 @@
 DEBUG	= -O3
 CC	= gcc
 INCLUDE	= -I/usr/local/include,/usr/include/mysql
-CFLAGS	= $(DEBUG) -Wall $(INCLUDE) -Winline -pipe
+CFLAGS	= $(DEBUG) -Wall $(INCLUDE) -Winline -pipe -std=c99
 
-LDFLAGS	= -L/usr/local/lib,/usr/lib/arm-linux-gnueabihf -lmysqlclient -lpthread -lz -lm -lrt -ldl
+LDFLAGS	= -L/usr/local/lib,/usr/lib/arm-linux-gnueabihf -lmysqlclient -lpthread -lz -lm -lrt -ldl -lconfig
 LDLIBS    = -lwiringPi -lwiringPiDev -lpthread -lm
 
 # Should not alter anything below this line
