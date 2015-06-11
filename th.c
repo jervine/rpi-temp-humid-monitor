@@ -13,6 +13,7 @@ rev 1.7 12/02/2013 WPNS allow more retries, minor cleanups
 rev 1.79 12/04/2013 WPNS release to instructables
 rev 1.8 01/06/2015 JDE updated code to try and drop anomolous temperature humidity readings before hitting the database
 rev 1.9 04/06/2015 JDE updated to try and read MySQL configuration from /etc/th.conf file rather than hard coding it
+rev 1.10 11/06/2015 JDE updated to remove echoing the config options to the th.log file
 
  */
 
@@ -79,35 +80,23 @@ int main()
     {
         /*Read the server*/
         if (config_setting_lookup_string(setting, "sqlServer", &sqlServer))
-        {
-            printf("\nMySQL Server to use: %s", sqlServer);
-        }
         else
-            printf("\nNo 'sqlServer' setting in configuration file.");
+            printf("\nERROR: No 'sqlServer' setting in configuration file.");
 
         /*Read the database*/
         if (config_setting_lookup_string(setting, "databaseName", &databaseName))
-        {
-            printf("\nMySQL database to use: %s", databaseName);
-        }
         else
-            printf("\nNo 'datbaseName' setting in configuration file.");
+            printf("\nERROR: No 'databaseName' setting in configuration file.");
 
         /*Read the username*/
         if (config_setting_lookup_string(setting, "username", &username))
-        {
-            printf("\nMySQL username to use: %s", username);
-        }
         else
-            printf("\nNo 'username' setting in configuration file.");
+            printf("\nERROR: No 'username' setting in configuration file.");
 
         /*Read the password*/
         if (config_setting_lookup_string(setting, "password", &password))
-        {
-            printf("\nMySQL password to use: %s", password);
-        }
         else
-            printf("\nNo 'password' setting in configuration file.");
+            printf("\nERROR: No 'password' setting in configuration file.");
 
         printf("\n");
     }
