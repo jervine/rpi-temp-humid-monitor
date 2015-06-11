@@ -79,22 +79,22 @@ int main()
     if (setting != NULL)
     {
         /*Read the server*/
-        if (config_setting_lookup_string(setting, "sqlServer", &sqlServer))
+        if (config_setting_lookup_string(setting, "sqlServer", &sqlServer));
         else
             printf("\nERROR: No 'sqlServer' setting in configuration file.");
 
         /*Read the database*/
-        if (config_setting_lookup_string(setting, "databaseName", &databaseName))
+        if (config_setting_lookup_string(setting, "databaseName", &databaseName));
         else
             printf("\nERROR: No 'databaseName' setting in configuration file.");
 
         /*Read the username*/
-        if (config_setting_lookup_string(setting, "username", &username))
+        if (config_setting_lookup_string(setting, "username", &username));
         else
             printf("\nERROR: No 'username' setting in configuration file.");
 
         /*Read the password*/
-        if (config_setting_lookup_string(setting, "password", &password))
+        if (config_setting_lookup_string(setting, "password", &password));
         else
             printf("\nERROR: No 'password' setting in configuration file.");
 
