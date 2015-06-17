@@ -132,7 +132,7 @@ int main()
     wiringPiSetup () ;
     piHiPri       (55) ;
 
-    printf("th.c rev 1.9 04/06/2015 JDE %sCycle time: %i seconds, %i retries\n",ctime(&oldtime),CYCLETIME,RETRIES);
+    printf("th.c rev 1.10 11/06/2015 JDE %sCycle time: %i seconds, %i retries\n",ctime(&oldtime),CYCLETIME,RETRIES);
     fflush(stdout);
 
     MYSQL *con = mysql_init(NULL);
