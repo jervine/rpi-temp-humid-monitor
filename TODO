@@ -1,5 +1,7 @@
 ## TO DO LIST
 
+ - Update the updateMysql.py script to calculate the time taken to run, so that the next run of sensorRead is run at 60 seconds MINUS the updateMysql run time.
+
  - Update the updateMySQL.py script to log details to the log file.
  
  - Update the daemon script so that the python script is daemonised.
