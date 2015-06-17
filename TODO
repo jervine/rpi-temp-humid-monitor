@@ -1,0 +1,7 @@
+## TO DO LIST
+
+ - Update the updateMySQL.py script to log details to the log file.
+ 
+ - Update the daemon script so that the python script is daemonised.
+ 
+ - Possibly update the python script to become a daemon itself, e.g. using python-daemon module.
