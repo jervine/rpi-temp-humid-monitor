@@ -6,33 +6,39 @@ import dhtreader
 import updateMysql
 import ConfigParser
 import time
+from time import strftime
 from threading import Timer,Thread,Event
 import logging
-from datetime import timedelta
 from datetime import datetime
+from datetime import timedelta
 
 oldtemp = "NULL"
 oldhumid = "NULL"
 
 def exec_every_n_seconds(n,f,*args):
-    first_called=datetime.now()
-    print args
-    f(*args)
-    num_calls=1
-    drift=timedelta()
-    time_period=timedelta(seconds=n)
+    waitInterval = timedelta(seconds=n)
+    print('We should read the sensor every {0} seconds'.format(waitInterval))
+    duration=f(*args)
+    offset = waitInterval - duration
+    print('Running the loop again in {0} seconds'.format(offset))
+    offset2 = offset.total_seconds()
+    print('Running the loop again in {0} seconds'.format(offset2))
     while 1:
-        time.sleep(n-drift.microseconds/1000000.0)
-        current_time = datetime.now()
-        f(*args)
-        num_calls += 1
-        difference = current_time - first_called
-        drift = difference - time_period* num_calls
-        print "drift=",drift
+        print('We are in the loop now ...')
+        time.sleep(offset2)
+        print('We are about to run the sensor read again')
+        duration=f(*args)
+        print('Duration of sequence was: {0}'.format(duration)) 
+        offset = waitInterval - duration
+        print('Running the loop again in {0} seconds'.format(offset))       
+        offset2 = offset.total_seconds()
+        print('Running the loop again in {0} seconds'.format(offset2))
 
 def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, maxhumid, minhumid):
     global oldtemp
     global oldhumid
+    startTime=datetime.now()
+    print('This round of results started at {0}'.format(startTime))
     for num in range(retries):
         try:
             t, h = dhtreader.read(dev_type, dhtpin)
@@ -67,7 +73,11 @@ def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, maxhumid, minhum
             else:
                     print("Failed to read from sensor, maybe try again?")
                     logging.warning('Failed to read from sensor, maybe try again?')
-    return 0
+    endTime=datetime.now()
+    print('This round of results ended at {0}'.format(endTime))
+    duration = endTime - startTime
+    print('Thiis round of results took {0} to complete'.format(duration))
+    return duration
 
 DHT11 = 11
 DHT22 = 22
