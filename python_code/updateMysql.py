@@ -4,17 +4,15 @@
 ##
 import sys
 import MySQLdb
-#import datetime
-#import time
 
-def main(temp, humid, host, db, user, passwd):
-    print('Temp = {0} *C, Hum = {1} %'.format(temp, humid))
-    print('Updating MySQL database next ...')
+def main(temp, humid, host, db, user, passwd, logging):
+    logging.debug('Temp = {0} *C, Hum = {1} %'.format(temp, humid))
+    logging.debug('Updating MySQL database next ...')
     connection = MySQLdb.connect(host,user,passwd,db)
     cursor=connection.cursor()
     sqltemp=format(temp, '5.1f')
     sqlhumid=format(humid, '5.1f')
-    print(sqltemp, sqlhumid)
+    logging.info('Temperature: {0}*C Humidity: {1}% ... updating to MySQL database'.format(sqltemp, sqlhumid))
     sql = """INSERT INTO TempHumid (ComputerTime, Temperature, Humidity, id) VALUES (unix_timestamp(now()), %s, %s, NULL)""" 
     args = (sqltemp, sqlhumid)
     cursor.execute(sql, args)

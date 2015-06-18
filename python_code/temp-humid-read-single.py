@@ -5,40 +5,18 @@ import sys
 import dhtreader
 import updateMysql
 import ConfigParser
-import time
-from time import strftime
-from threading import Timer,Thread,Event
+#import time
+#from threading import Timer,Thread,Event
 import logging
-from datetime import datetime
-from datetime import timedelta
+#from datetime import datetime
+#from datetime import timedelta
 
 oldtemp = "NULL"
 oldhumid = "NULL"
 
-def exec_every_n_seconds(n,f,*args):
-    waitInterval = timedelta(seconds=n)
-    logging.debug('We should read the sensor every {0} seconds'.format(waitInterval))
-    duration=f(*args)
-    offset = waitInterval - duration
-    logging.debug('Running the loop again in {0} seconds (printed as datetime)'.format(offset))
-    offset2 = offset.total_seconds()
-    logging.debug('Running the loop again in {0} seconds (printed as float)'.format(offset2))
-    while 1:
-        logging.debug('We are in the loop now ...')
-        time.sleep(offset2)
-        logging.debug('We are about to run the sensor read again')
-        duration=f(*args)
-        logging.debug('Duration of sequence was: {0}'.format(duration)) 
-        offset = waitInterval - duration
-        logging.debug('Running the loop again in {0} seconds (printed as dateime)'.format(offset))       
-        offset2 = offset.total_seconds()
-        logging.debug('Running the loop again in {0} seconds (printed as float)'.format(offset2))
-
 def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, maxhumid, minhumid):
     global oldtemp
     global oldhumid
-    startTime=datetime.now()
-    logging.debug('This round of results started at {0}'.format(startTime))
     for num in range(retries):
         try:
             t, h = dhtreader.read(dev_type, dhtpin)
@@ -50,7 +28,7 @@ def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, maxhumid, minhum
                 logging.error('Exception detected - we are out of retries. Skipping the measurement in this cycle.')
         else:
             if t and h:
-                logging.debug('Temperature and humidity read as {0} and {1}'.format(t, h))
+                logging.debug('The temperature and humidity have been read as {0} and {1}'.format(t, h))
                 if (oldtemp != "NULL") and ((t - oldtemp < tempdiff) or (oldtemp - t < tempdiff)) and ((h - oldhumid < humiddiff) or (oldhumid - h < humiddif)):
                     logging.debug('Current temperature close enough to previous temperature and previous temperature is not NULL, it is: %s', oldtemp)
                     logging.debug('Current humidity close enough to previous humidity and previous humidity is not NULL, it is: %s', oldhumid)
@@ -64,11 +42,7 @@ def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, maxhumid, minhum
                     logging.error('Temperature {0} or humidity {1} is outside of allowable values - error! Check your configuration.'.format(t, h))
             else:
                     logging.warning('Failed to read from sensor, maybe try again?')
-    endTime=datetime.now()
-    logging.debug('This round of results ended at {0}'.format(endTime))
-    duration = endTime - startTime
-    logging.debug('This round of results took {0} to complete'.format(duration))
-    return duration
+    return 0
 
 DHT11 = 11
 DHT22 = 22
@@ -128,7 +102,5 @@ if dhtpin <= 0:
     sys.exit(3)
 
 logging.info("using pin #{0}".format(dhtpin))
-logging.info('Multiple (infinte looped)  run temperature and humidity reading. [version: 1.0, Jonathan Ervine, 2015-06-17]')
-
-logging.debug("About to enter infinite loop")
-exec_every_n_seconds(60,sensorRead,hwtype,pin,retries,timeout,maxtemp,mintemp,maxhumid,minhumid)
+logging.info('Single run temperature and humidity reading. [version: 1.0, Jonathan Ervine, 2015-06-17]')
+sensorRead(hwtype,pin,retries,timeout,maxtemp,mintemp,maxhumid,minhumid)
