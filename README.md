@@ -9,7 +9,7 @@ The th.c code was modified so that a forth column in MySQL is used (an auto incr
 
 Using a thd init script means that we don't need to modify /etc/rc.local - which is useful for me as this file is used by other projects and can be overwritten at times.
 
-## UPDATED - 17 June 2015
+## UPDATED - 18 June 2015
 There are now two python scripts (with logging added rather than printing to stdout)
 
  - temp-humid-python-loop.py - this code should loop and run the temperature/humidity readind every 60 seconds. I have tried to add code to ensure that this loops every 60 seconds regardless of how long the actual reading takes. Due to occasional reading errors, the function to read temperature and humidity can vary in length - dependent upon the timeout and number of retries conifgured. The code hsould time the length of the sensorRead function and subtract this time from the configured reading interval. Tests have shown this is reasonably accurate but some drift has still been observed.
