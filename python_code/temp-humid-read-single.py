@@ -34,7 +34,7 @@ def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, maxhumid, minhum
                     logging.debug('Current humidity close enough to previous humidity and previous humidity is not NULL, it is: %s', oldhumid)
                 if (t < maxtemp) and (t > mintemp) and (h < maxhumid) and (h > minhumid):
                     logging.debug('Temperature is less than {0} and greater than {1}, humidity is less than {2} and greater than {3}'.format(maxtemp,mintemp,maxhumid,minhumid))
-                    updateMysql.main(t, h, host, db, username, password, logging)
+                    updateMysql.main(t, h, host, db, username, password, logging, sql_retries, sql_timeout)
                     oldtemp=t
                     oldhumid=h
                     break
@@ -67,6 +67,8 @@ host=(config.get('database', 'host'))
 db=(config.get('database', 'db'))
 username=(config.get('database', 'username'))
 password=(config.get('database', 'password'))
+sql_retries=int((config.get('database', 'sql_retries')))
+sql_timeout=(config.get('database', 'sql_timeout'))
 
 
 if loglevel == "debug":
