@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#/usr/bin/env python
 # -*- coding:utf-8 -*-
 
 import sys
@@ -25,16 +25,20 @@ def exec_every_n_seconds(n,f,*args):
     logging.debug('Running the loop again in {0} seconds (printed as float)'.format(offset2))
     while 1:
         logging.debug('We are in the loop now ...')
-        time.sleep(offset2)
+        initTime=time.time()
+        logging.debug('Start time is {0}'.format(initTime))
+        #time.sleep(offset2)
         logging.debug('We are about to run the sensor read again')
         duration=f(*args)
+        offset2 = (60.0 - (time.time() - initTime))
+        time.sleep(60.0 - ((time.time() - initTime) % 60.0))
         logging.debug('Duration of sequence was: {0}'.format(duration)) 
         offset = waitInterval - duration
         logging.debug('Running the loop again in {0} seconds (printed as dateime)'.format(offset))       
-        offset2 = offset.total_seconds()
+        #offset2 = offset.total_seconds()
         logging.debug('Running the loop again in {0} seconds (printed as float)'.format(offset2))
 
-def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, maxhumid, minhumid):
+def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, tempdiff, maxhumid, minhumid, humiddiff):
     global oldtemp
     global oldhumid
     startTime=datetime.now()
@@ -51,6 +55,7 @@ def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, maxhumid, minhum
         else:
             if t and h:
                 logging.debug('Temperature and humidity read as {0} and {1}'.format(t, h))
+                logging.debug('Temperature and Humidity differences allowed: {0} and {1}'.format(tempdiff, humiddiff))
                 if (oldtemp != "NULL") and ((t - oldtemp < tempdiff) or (oldtemp - t < tempdiff)) and ((h - oldhumid < humiddiff) or (oldhumid - h < humiddif)):
                     logging.debug('Current temperature close enough to previous temperature and previous temperature is not NULL, it is: %s', oldtemp)
                     logging.debug('Current humidity close enough to previous humidity and previous humidity is not NULL, it is: %s', oldhumid)
@@ -133,4 +138,4 @@ logging.info("using pin #{0}".format(dhtpin))
 logging.info('Multiple (infinte looped)  run temperature and humidity reading. [version: 1.0, Jonathan Ervine, 2015-06-17]')
 
 logging.debug("About to enter infinite loop")
-exec_every_n_seconds(60,sensorRead,hwtype,pin,retries,timeout,maxtemp,mintemp,maxhumid,minhumid)
+exec_every_n_seconds(60,sensorRead,hwtype,pin,retries,timeout,maxtemp,mintemp,tempdiff,maxhumid,minhumid,humiddiff)

@@ -14,7 +14,7 @@ import logging
 oldtemp = "NULL"
 oldhumid = "NULL"
 
-def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, maxhumid, minhumid):
+def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, tempdiff, maxhumid, minhumid, humiddiff):
     global oldtemp
     global oldhumid
     for num in range(retries):
@@ -105,4 +105,4 @@ if dhtpin <= 0:
 
 logging.info("using pin #{0}".format(dhtpin))
 logging.info('Single run temperature and humidity reading. [version: 1.0, Jonathan Ervine, 2015-06-17]')
-sensorRead(hwtype,pin,retries,timeout,maxtemp,mintemp,maxhumid,minhumid)
+sensorRead(hwtype,pin,retries,timeout,maxtemp,mintemp,tempdiff,maxhumid,minhumid,humiddiff)
