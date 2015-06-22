@@ -9,6 +9,9 @@ The th.c code was modified so that a forth column in MySQL is used (an auto incr
 
 Using a thd init script means that we don't need to modify /etc/rc.local - which is useful for me as this file is used by other projects and can be overwritten at times.
 
+## UPDATED - 23 June 2015
+Fixed a bug in the code where the script would crash as I hadn't passed the temperature and humidity difference tolerances allowed to the loop. If an erroneous reading was made, the script would crash.
+
 ## UPDATED - 19 June 2015
 The updateMysql.py script has been updated to provide a method of retrying failed MySQL updates. Primarily this was added so that when the server is booted up, the daemon version of the code can retry a number of times before giving up, as the MySQL server will not necessarily have finished starting up.
 
