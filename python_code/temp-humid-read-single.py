@@ -29,7 +29,7 @@ def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, tempdiff, maxhum
         else:
             if t and h:
                 logging.debug('The temperature and humidity have been read as {0} and {1}'.format(t, h))
-                if (oldtemp != "NULL") and ((t - oldtemp < tempdiff) or (oldtemp - t < tempdiff)) and ((h - oldhumid < humiddiff) or (oldhumid - h < humiddif)):
+                if (oldtemp != "NULL") and ((t - oldtemp < tempdiff) or (oldtemp - t < tempdiff)) and ((h - oldhumid < humiddiff) or (oldhumid - h < humiddiff)):
                     logging.debug('Current temperature close enough to previous temperature and previous temperature is not NULL, it is: %s', oldtemp)
                     logging.debug('Current humidity close enough to previous humidity and previous humidity is not NULL, it is: %s', oldhumid)
                 if (t < maxtemp) and (t > mintemp) and (h < maxhumid) and (h > minhumid):
