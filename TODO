@@ -1,3 +1,4 @@
 ## TO DO LIST
 
- - Possibly update the python script to become a daemon itself, e.g. using python-daemon module.
+ - Update the single run python script so that it reads the MySQL database for the previous values of temperature and humidity, as it doesn't loop and therefore doesn't maintain the previous readings.
+
