@@ -4,12 +4,13 @@
 import sys
 import dhtreader
 import updateMysql
+import readMysql
 import ConfigParser
-#import time
-#from threading import Timer,Thread,Event
 import logging
-#from datetime import datetime
-#from datetime import timedelta
+import time
+from time import strftime
+from datetime import datetime
+from datetime import timedelta
 
 oldtemp = "NULL"
 oldhumid = "NULL"
@@ -17,6 +18,8 @@ oldhumid = "NULL"
 def sensorRead(hwtype, pin, retries, timeout, maxtemp, mintemp, tempdiff, maxhumid, minhumid, humiddiff):
     global oldtemp
     global oldhumid
+    oldtemp, oldhumid = readMysql.main(host, db, username, password, logging, sql_retries, sql_timeout)
+    logging.debug('We have returned the following previous temperature {0} and humidity {1} values.'.format(oldtemp, oldhumid))
     for num in range(retries):
         try:
             t, h = dhtreader.read(dev_type, dhtpin)
@@ -49,7 +52,7 @@ DHT22 = 22
 AM2302 = 22
 
 config = ConfigParser.ConfigParser()
-config.read('temphumid.conf')
+config.read('/etc/thMonitor.conf')
 hwtype=config.get('hardware', 'DHT')
 pin=config.get('hardware', 'PIN')
 retries=int(config.get('software', 'retries'))
