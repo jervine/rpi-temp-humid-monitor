@@ -9,6 +9,9 @@ The th.c code was modified so that a fourth column in MySQL is used (an auto inc
 
 Using a thd init script means that we don't need to modify /etc/rc.local - which is useful for me as this file is used by other projects and can be overwritten at times.
 
+## UPDATED - 10 July 2015
+Added a python script, readMysql.py, to read the previous values of temperature and humidity from the MySQL database. This is necessary for the single run python script, as we don't have a previous reading to compare against.
+
 ## UPDATED - 24 June 2015
 Fixed a typo in a variable name (humiddiff) that could cause the daemon to crash if an erroneous reading was made.
 
@@ -20,16 +23,14 @@ The updateMysql.py script has been updated to provide a method of retrying faile
 
 An updated thMonitord init script has been added, and the temp-humid-read-loop and temp-humid-read-single scripts have been altered so that they are currently hardcoded to use a configuration file called /etc/thMonitor.conf
 
-
 ## UPDATED - 18 June 2015
 There are now two python scripts (with logging added rather than printing to stdout)
 
- - temp-humid-read-loop.py - this code should loop and run the temperature/humidity readind every 60 seconds. I have tried to add code to ensure that this loops every 60 seconds regardless of how long the actual reading takes. Due to occasional reading errors, the function to read temperature and humidity can vary in length - dependent upon the timeout and number of retries conifgured. The code hsould time the length of the sensorRead function and subtract this time from the configured reading interval. Tests have shown this is reasonably accurate but some drift has still been observed.
+ - temp-humid-read-loop.py - this code should loop and run the temperature/humidity readind every 60 seconds. I have tried to add code to ensure that this loops every 60 seconds regardless of how long the actual reading takes. Due to occasional reading errors, the function to read temperature and humidity can vary in length - dependent upon the timeout and number of retries conifgured. The code should time the length of the sensorRead function and subtract this time from the configured reading interval. Tests have shown this is reasonably accurate but some drift has still been observed.
 
  - temp-humid-python-single.py - this code is a simplified python script taken from the looping script. The looping logic has been removed, and a single pass is made reading the temperature and humidity readings. Any errors from a reading during this single pass are retried according to the timeout and retries configured though - so a single read should succeed. This script can be put into a cron job to run on a regularly scheduled basis, which might be less prone to drift than the looped version.
 
  - updateMysql.py - this code has been cleaned up so that it logs to the logfile rather than to stdout by default.
-
 
 ## UPDATED - 17 June 2015
 Looking to replace the C code with a python script that takes a configuration file. Added here:
