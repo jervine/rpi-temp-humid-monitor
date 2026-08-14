@@ -1,0 +1,15 @@
+[Unit]
+Description=Raspberry Pi Temperature and Humidity Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=@INSTALL_ROOT@
+ExecStart=@VENV_PYTHON@ @INSTALL_ROOT@/temp-humid-read-loop.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

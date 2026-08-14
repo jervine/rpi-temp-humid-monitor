@@ -3,30 +3,70 @@ Raspberry Pi temperature humidity monitor
 
 ## Python 3 setup
 
-The Python monitoring scripts now require Python 3 and use `adafruit-circuitpython-dht`
+The Python monitoring scripts require Python 3 and use `adafruit-circuitpython-dht`
 instead of the legacy Python 2 `dhtreader.so` extension.
 
-On the Raspberry Pi:
+### Recommended install (venv + systemd)
+
+From a clone of this repository on the Raspberry Pi:
 
 ```bash
-sudo apt install python3 python3-pip python3-dev default-libmysqlclient-dev build-essential
-cd python_code
-sudo pip3 install -r requirements.txt
-sudo cp temphumid.conf /etc/thMonitor.conf   # edit credentials and GPIO pin
-sudo cp temp-humid-read-loop.py temp-humid-read-single.py updateMysql.py readMysql.py thmonitor_common.py dhtreader.py /usr/local/bin/thMonitor/
-sudo rm -f /usr/local/bin/thMonitor/dhtreader.so   # remove legacy Python 2 extension if present
-sudo cp thMonitord /etc/init.d/thMonitor
-sudo update-rc.d thMonitor defaults
+cd rpi-temp-humid-monitor
+sudo ./install.sh
 ```
 
-The loop daemon runs with `/usr/bin/python3 /usr/local/bin/thMonitor/temp-humid-read-loop.py`.
-The single-run script is suitable for cron:
+This will:
 
-```cron
-* * * * * /usr/bin/python3 /usr/local/bin/thMonitor/temp-humid-read-single.py
+- install required system packages (`python3-venv`, `default-libmysqlclient-dev`, etc.)
+- create a virtual environment at `/usr/local/lib/thmonitor/venv`
+- install Python dependencies into that venv (not system-wide)
+- install app files to `/usr/local/lib/thmonitor`
+- install `/etc/thMonitor.conf` if it does not already exist
+- install command wrappers: `thmonitor-single`, `thmonitor-loop`
+- enable and start the `thmonitor` systemd service (loop daemon)
+
+Edit `/etc/thMonitor.conf` after install (GPIO pin, MySQL credentials, limits).
+
+Useful commands:
+
+```bash
+sudo systemctl status thmonitor
+sudo systemctl restart thmonitor
+tail -f /var/log/th-python.log
+thmonitor-single    # one-off read (uses venv)
 ```
 
-The legacy `dhtreader.so` binary is no longer used and can be removed after upgrading.
+Cron-based single-shot mode instead of the loop daemon:
+
+```bash
+sudo ./install.sh --cron
+```
+
+Install without starting the service:
+
+```bash
+sudo ./install.sh --no-start
+```
+
+Uninstall:
+
+```bash
+sudo ./install.sh --uninstall
+```
+
+### Manual install (legacy)
+
+If you prefer not to use the installer:
+
+```bash
+sudo apt install python3 python3-pip python3-dev python3-venv default-libmysqlclient-dev build-essential
+python3 -m venv /usr/local/lib/thmonitor/venv
+sudo /usr/local/lib/thmonitor/venv/bin/pip install -r python_code/requirements.txt
+sudo cp python_code/temphumid.conf /etc/thMonitor.conf   # edit credentials and GPIO pin
+# copy python_code/*.py to your chosen install directory and point systemd/cron at the venv python
+```
+
+Do not copy or keep `dhtreader.so`; use `dhtreader.py` instead.
 
 ---
 
