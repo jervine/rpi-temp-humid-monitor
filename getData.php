@@ -4,42 +4,47 @@ $username = "USERNAME";
 $password = "PASSWORD";
 $dbname = "Monitoring";
 
-$rows = array();
 $table = array();
 $table['cols'] = array(
-    // Labels for your chart, these represent the column titles
     array('label' => 'Date and Time', 'type' => 'number'),
     array('label' => 'Temperature', 'type' => 'number'),
     array('label' => 'Humidity', 'type' => 'number')
-); 
+);
 
-// Create connection
-//$conn = new mysqli($servername, $username, $password, $dbname);
 $conn = mysqli_connect($servername, $username, $password, $dbname);
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+if (!$conn) {
+    header('HTTP/1.1 500 Internal Server Error');
+    header('Content-type: application/json');
+    echo json_encode(array('error' => 'Connection failed: ' . mysqli_connect_error()));
+    exit;
 }
 
-$sql = "SELECT ComputerTime, Temperature, Humidity from TempHumid ORDER BY id DESC LIMIT 360";
-$result = mysqli_query($conn,$sql);
+$sql = "SELECT ComputerTime, Temperature, Humidity FROM ("
+     . "SELECT ComputerTime, Temperature, Humidity FROM TempHumid "
+     . "ORDER BY id DESC LIMIT 360"
+     . ") AS recent ORDER BY ComputerTime ASC";
+$result = mysqli_query($conn, $sql);
 
-//if ($result->num_rows > 0) {
-    // output data of each row
-    while($row = mysqli_fetch_array($result)) {
-       $temp = array();
-//       $datetime = date('d/m/Y H:i', $row[0]);
-//       $temp[] = array('v' => $datetime); 
-       $temp[] = array('v' => $row[0]); 
-       $temp[] = array('v' => $row[1]); 
-       $temp[] = array('v' => $row[2]); 
-       $rows[] = array('c' => $temp); 
+$rows = array();
+if ($result) {
+    while ($row = mysqli_fetch_array($result)) {
+        $temp = array();
+        $temp[] = array('v' => (float)$row[0]);
+        $temp[] = array('v' => (float)$row[1]);
+        $temp[] = array('v' => (float)$row[2]);
+        $rows[] = array('c' => $temp);
     }
-//} else {
-//    echo "No current temperature  - ERROR?";
-//}
+    mysqli_free_result($result);
+} else {
+    header('HTTP/1.1 500 Internal Server Error');
+    header('Content-type: application/json');
+    echo json_encode(array('error' => 'Query failed: ' . mysqli_error($conn)));
+    mysqli_close($conn);
+    exit;
+}
+
 $table['rows'] = $rows;
 header('Content-type: application/json');
 echo json_encode($table);
-$conn->close();
+mysqli_close($conn);
 ?>
