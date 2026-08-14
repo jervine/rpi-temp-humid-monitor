@@ -1,4 +1,6 @@
 ## TO DO LIST
 
- - Update the single run python script so that it reads the MySQL database for the previous values of temperature and humidity, as it doesn't loop and therefore doesn't maintain the previous readings.
+ - Consider migrating from the legacy Python 2 / dhtreader.so stack to a maintained
+   DHT library (e.g. Adafruit CircuitPython or lgpio-based driver) for current Pi OS releases.
 
+ - Externalize getData.php database credentials into a config file outside the web root.
