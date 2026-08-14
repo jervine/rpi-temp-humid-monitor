@@ -2,12 +2,6 @@
 #
 # Install rpi-temp-humid-monitor as a system app with a Python venv.
 #
-# Usage:
-#   sudo ./install.sh              # systemd loop daemon (default)
-#   sudo ./install.sh --cron       # cron single-shot mode instead
-#   sudo ./install.sh --no-start   # install only, do not enable/start
-#   sudo ./install.sh --uninstall  # remove installed app files
-#
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,6 +19,7 @@ LEGACY_DIR="/usr/local/bin/thMonitor"
 
 RUN_MODE="systemd"
 DO_START=1
+DO_INSTALL=0
 DO_UNINSTALL=0
 
 APT_PACKAGES=(
@@ -46,11 +41,36 @@ PYTHON_MODULES=(
 )
 
 usage() {
-    sed -n '3,10p' "$0" | sed 's/^# \?//'
-    echo
-    echo "Environment overrides:"
-    echo "  INSTALL_ROOT   Install directory (default: ${INSTALL_ROOT})"
-    echo "  CONFIG_FILE    Config file path (default: ${CONFIG_FILE})"
+    local cmd
+    cmd="$(basename "$0")"
+    cat <<EOF
+Install rpi-temp-humid-monitor as a system app with a Python venv.
+
+Usage:
+  sudo ./$cmd --install [options]
+  sudo ./$cmd --uninstall
+  ./$cmd --help
+
+Actions:
+  --install       Install the monitor (venv, app files, wrappers, systemd by default)
+  --uninstall     Remove installed app files, wrappers, and services
+  -h, --help      Show this help
+
+Install options:
+  --cron          Use a cron job for single-shot reads instead of the systemd loop
+  --no-start      Install files and unit, but do not enable or start the service
+
+Environment overrides:
+  INSTALL_ROOT    Install directory (default: ${INSTALL_ROOT})
+  CONFIG_FILE     Config file path (default: ${CONFIG_FILE})
+  LOG_FILE        Log file path (default: ${LOG_FILE})
+
+Examples:
+  sudo ./$cmd --install
+  sudo ./$cmd --install --cron
+  sudo ./$cmd --install --no-start
+  sudo ./$cmd --uninstall
+EOF
 }
 
 log() {
@@ -69,8 +89,17 @@ need_root() {
 }
 
 parse_args() {
+    if [[ $# -eq 0 ]]; then
+        usage
+        exit 0
+    fi
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            --install)
+                DO_INSTALL=1
+                shift
+                ;;
             --cron)
                 RUN_MODE="cron"
                 shift
@@ -92,6 +121,21 @@ parse_args() {
                 ;;
         esac
     done
+
+    if [[ "$DO_INSTALL" -eq 1 && "$DO_UNINSTALL" -eq 1 ]]; then
+        die "Choose either --install or --uninstall"
+    fi
+
+    if [[ "$DO_UNINSTALL" -eq 1 ]]; then
+        if [[ "$RUN_MODE" == "cron" || "$DO_START" -eq 0 ]]; then
+            die "--cron and --no-start apply only with --install"
+        fi
+        return
+    fi
+
+    if [[ "$DO_INSTALL" -ne 1 ]]; then
+        die "Specify --install or --uninstall (try --help)"
+    fi
 }
 
 install_apt_deps() {
@@ -338,6 +382,9 @@ parse_args "$@"
 
 if [[ "$DO_UNINSTALL" -eq 1 ]]; then
     do_uninstall
-else
+elif [[ "$DO_INSTALL" -eq 1 ]]; then
     do_install
+else
+    usage
+    exit 0
 fi

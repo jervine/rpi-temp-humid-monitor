@@ -12,7 +12,8 @@ From a clone of this repository on the Raspberry Pi:
 
 ```bash
 cd rpi-temp-humid-monitor
-sudo ./install.sh
+./install.sh            # show help
+sudo ./install.sh --install
 ```
 
 This will:
@@ -39,13 +40,13 @@ thmonitor-single    # one-off read (uses venv)
 Cron-based single-shot mode instead of the loop daemon:
 
 ```bash
-sudo ./install.sh --cron
+sudo ./install.sh --install --cron
 ```
 
 Install without starting the service:
 
 ```bash
-sudo ./install.sh --no-start
+sudo ./install.sh --install --no-start
 ```
 
 Uninstall:
