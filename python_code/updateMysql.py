@@ -1,8 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 ##
 ## Script to import the temperature and humidity into a MySQL database
 ##
 import time
+
 import MySQLdb
 
 
@@ -31,7 +32,7 @@ def main(temp, humid, host, db, user, passwd, logging, sql_retries, sql_timeout)
             logging.debug('The MySQL database was successfully updated.')
             return 0
         except MySQLdb.Error as e:
-            logging.warn(
+            logging.warning(
                 'MySQL update failed (attempt %d/%d): %d: %s',
                 attempt + 1, sql_retries, e.args[0], e.args[1],
             )

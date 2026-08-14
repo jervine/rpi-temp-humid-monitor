@@ -1,8 +1,9 @@
-#!/usr/bin/env python
-# -*- coding:utf-8 -*-
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-import time
 import logging
+import time
+
 import dhtreader
 import updateMysql
 import thmonitor_common as common
@@ -91,7 +92,7 @@ def main():
 
     logging.info(
         'Multiple (infinite loop) temperature and humidity reading '
-        '[version: 1.1, Jonathan Ervine, 2015-06-17]'
+        '[version: 2.0, Python 3]'
     )
     run_loop(cfg, dev_type, dhtpin)
 

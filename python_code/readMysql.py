@@ -1,8 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 ##
 ## Script to read the last temperature and humidity readings from a MySQL database
 ##
 import time
+
 import MySQLdb
 
 NO_PREVIOUS = ('NULL', 'NULL')
@@ -37,7 +38,7 @@ def main(host, db, user, passwd, logging, sql_retries, sql_timeout):
             )
             return oldtemp, oldhumid
         except MySQLdb.Error as e:
-            logging.warn(
+            logging.warning(
                 'MySQL read failed (attempt %d/%d): %d: %s',
                 attempt + 1, sql_retries, e.args[0], e.args[1],
             )

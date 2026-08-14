@@ -1,12 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Shared configuration, logging, and sensor validation for thMonitor scripts."""
 
-from __future__ import print_function
-
 import sys
 import logging
-import ConfigParser
+import configparser
 
 DHT11 = 11
 DHT22 = 22
@@ -17,9 +15,9 @@ DEFAULT_CONFIG = '/etc/thMonitor.conf'
 
 def load_config(path=DEFAULT_CONFIG):
     """Load and return thMonitor configuration as a dict."""
-    config = ConfigParser.ConfigParser()
+    config = configparser.ConfigParser()
     if not config.read(path):
-        print('ERROR: configuration file not found: {0}'.format(path), file=sys.stderr)
+        print(f'ERROR: configuration file not found: {path}', file=sys.stderr)
         sys.exit(1)
 
     return {
@@ -72,7 +70,7 @@ def resolve_dht_type(hwtype):
         '2302': (AM2302, 'AM2302'),
     }
     if hwtype not in types:
-        logging.warn(
+        logging.warning(
             'Invalid hardware type %r; supported values are 11, 22, and 2302',
             hwtype,
         )
@@ -86,7 +84,7 @@ def validate_pin(pin):
     """Return GPIO pin number or exit if invalid."""
     dhtpin = int(pin)
     if dhtpin <= 0:
-        logging.warn('Invalid GPIO pin number: %s', pin)
+        logging.warning('Invalid GPIO pin number: %s', pin)
         sys.exit(3)
     logging.info('using pin #%d', dhtpin)
     return dhtpin

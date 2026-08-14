@@ -25,3 +25,11 @@ proguard/
 
 # Log Files
 *.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.python-version
+.venv/
+venv/

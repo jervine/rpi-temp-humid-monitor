@@ -1,6 +1,35 @@
 # rpi-temp-humid-monitor
 Raspberry Pi temperature humidity monitor
 
+## Python 3 setup
+
+The Python monitoring scripts now require Python 3 and use `adafruit-circuitpython-dht`
+instead of the legacy Python 2 `dhtreader.so` extension.
+
+On the Raspberry Pi:
+
+```bash
+sudo apt install python3 python3-pip python3-dev default-libmysqlclient-dev build-essential
+cd python_code
+sudo pip3 install -r requirements.txt
+sudo cp temphumid.conf /etc/thMonitor.conf   # edit credentials and GPIO pin
+sudo cp temp-humid-read-loop.py temp-humid-read-single.py updateMysql.py readMysql.py thmonitor_common.py dhtreader.py /usr/local/bin/thMonitor/
+sudo rm -f /usr/local/bin/thMonitor/dhtreader.so   # remove legacy Python 2 extension if present
+sudo cp thMonitord /etc/init.d/thMonitor
+sudo update-rc.d thMonitor defaults
+```
+
+The loop daemon runs with `/usr/bin/python3 /usr/local/bin/thMonitor/temp-humid-read-loop.py`.
+The single-run script is suitable for cron:
+
+```cron
+* * * * * /usr/bin/python3 /usr/local/bin/thMonitor/temp-humid-read-single.py
+```
+
+The legacy `dhtreader.so` binary is no longer used and can be removed after upgrading.
+
+---
+
 This is my implementation of making a Raspberry Pi powered temperature and humidity monitor. The original instructions that I followed were created by wpnsmith at [the instructables website](http://www.instructables.com/id/Raspberry-Pi-Temperature-Humidity-Network-Monitor/)
 
 In this repository are my copies of the th.c code, a thd init script, and two files for creating a Google Chart graph rather than the python based GraphTH.py using matplotlib that wpnsmith used.
@@ -41,7 +70,7 @@ Looking to replace the C code with a python script that takes a configuration fi
 
  - temphumid.conf - sample configuration file to be used with the python script
 
- - dhtreader.so - binary shared object file. This has been created from [http://www.airspayce.com/mikem/bcm2835/](http://www.airspayce.com/mikem/bcm2835/)
+ - dhtreader.py - pure Python DHT reader wrapper using adafruit-circuitpython-dht (replaces dhtreader.so)
 
 ###Please note this updated python code was heavily inspired by the work done by Adafruit here:###
 [https://github.com/adafruit/Adafruit-Raspberry-Pi-Python-Code/tree/master/Adafruit_DHT_Driver_Python](https://github.com/adafruit/Adafruit-Raspberry-Pi-Python-Code/tree/master/Adafruit_DHT_Driver_Python)
