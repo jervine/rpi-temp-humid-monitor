@@ -330,7 +330,7 @@ Installation complete.
 
 Next steps:
   1. Edit ${CONFIG_FILE} (GPIO pin, MySQL credentials, limits).
-  2. Ensure the TempHumid table exists in your MySQL database.
+  2. Ensure the configured table (default: bedRoomTempHumid) exists in your MySQL database.
 EOF
 
     if [[ "$RUN_MODE" == "systemd" ]]; then

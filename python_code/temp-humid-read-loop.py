@@ -53,7 +53,8 @@ def sensor_read(cfg, dev_type, dhtpin):
         if common.reading_is_plausible(t, h, oldtemp, oldhumid, limits):
             updateMysql.main(
                 t, h,
-                cfg['host'], cfg['db'], cfg['username'], cfg['password'],
+                cfg['host'], cfg['db'], cfg['table'],
+                cfg['username'], cfg['password'],
                 logging, cfg['sql_retries'], cfg['sql_timeout'],
             )
             oldtemp = t

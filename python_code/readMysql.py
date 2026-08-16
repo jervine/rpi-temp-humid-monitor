@@ -9,11 +9,11 @@ import MySQLdb
 NO_PREVIOUS = ('NULL', 'NULL')
 
 
-def main(host, db, user, passwd, logging, sql_retries, sql_timeout):
+def main(host, db, table, user, passwd, logging, sql_retries, sql_timeout):
     logging.debug('Reading MySQL database next ...')
 
     sql = (
-        'SELECT Temperature, Humidity FROM TempHumid '
+        f'SELECT Temperature, Humidity FROM `{table}` '
         'ORDER BY ComputerTime DESC LIMIT 1'
     )
 

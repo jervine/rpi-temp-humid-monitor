@@ -7,18 +7,18 @@ import time
 import MySQLdb
 
 
-def main(temp, humid, host, db, user, passwd, logging, sql_retries, sql_timeout):
+def main(temp, humid, host, db, table, user, passwd, logging, sql_retries, sql_timeout):
     logging.debug('Temp = %s *C, Hum = %s %%', temp, humid)
     logging.debug('Updating MySQL database next ...')
 
     sql = (
-        'INSERT INTO TempHumid (ComputerTime, Temperature, Humidity, id) '
+        f'INSERT INTO `{table}` (ComputerTime, Temperature, Humidity, id) '
         'VALUES (unix_timestamp(now()), %s, %s, NULL)'
     )
     args = (format(temp, '5.1f'), format(humid, '5.1f'))
     logging.info(
-        'Temperature: %s*C Humidity: %s%% ... updating to MySQL database',
-        args[0], args[1],
+        'Temperature: %s*C Humidity: %s%% ... updating MySQL table %s',
+        args[0], args[1], table,
     )
 
     for attempt in range(sql_retries):

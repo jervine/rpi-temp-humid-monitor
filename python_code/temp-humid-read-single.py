@@ -13,7 +13,8 @@ import thmonitor_common as common
 def sensor_read(cfg, dev_type, dhtpin):
     """Perform a single sensor read using the last DB values for validation."""
     oldtemp, oldhumid = readMysql.main(
-        cfg['host'], cfg['db'], cfg['username'], cfg['password'],
+        cfg['host'], cfg['db'], cfg['table'],
+        cfg['username'], cfg['password'],
         logging, cfg['sql_retries'], cfg['sql_timeout'],
     )
     logging.debug(
@@ -57,7 +58,8 @@ def sensor_read(cfg, dev_type, dhtpin):
         if common.reading_is_plausible(t, h, oldtemp, oldhumid, limits):
             updateMysql.main(
                 t, h,
-                cfg['host'], cfg['db'], cfg['username'], cfg['password'],
+                cfg['host'], cfg['db'], cfg['table'],
+                cfg['username'], cfg['password'],
                 logging, cfg['sql_retries'], cfg['sql_timeout'],
             )
             return 0

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """Shared configuration, logging, and sensor validation for thMonitor scripts."""
 
+import re
 import sys
 import logging
 import configparser
@@ -11,6 +12,19 @@ DHT22 = 22
 AM2302 = 22
 
 DEFAULT_CONFIG = '/etc/thMonitor.conf'
+_TABLE_NAME_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+
+
+def validate_table_name(name):
+    """Return table name if it is a safe SQL identifier, else exit."""
+    if not _TABLE_NAME_RE.match(name):
+        print(
+            f'ERROR: invalid database table name {name!r} '
+            '(use letters, digits, and underscores only)',
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return name
 
 
 def load_config(path=DEFAULT_CONFIG):
@@ -37,6 +51,7 @@ def load_config(path=DEFAULT_CONFIG):
         'loglevel': config.get('software', 'loglevel'),
         'host': config.get('database', 'host'),
         'db': config.get('database', 'db'),
+        'table': validate_table_name(config.get('database', 'table')),
         'username': config.get('database', 'username'),
         'password': config.get('database', 'password'),
         'sql_retries': config.getint('database', 'sql_retries'),
