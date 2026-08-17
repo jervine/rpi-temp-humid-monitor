@@ -82,7 +82,10 @@ def main():
         'Single run temperature and humidity reading '
         '[version: 2.0, Python 3]'
     )
-    return sensor_read(cfg, dev_type, dhtpin)
+    try:
+        return sensor_read(cfg, dev_type, dhtpin)
+    finally:
+        dhtreader.close()
 
 
 if __name__ == '__main__':
