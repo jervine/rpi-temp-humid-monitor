@@ -51,7 +51,9 @@ def load_config(path=DEFAULT_CONFIG):
         'loglevel': config.get('software', 'loglevel'),
         'host': config.get('database', 'host'),
         'db': config.get('database', 'db'),
-        'table': validate_table_name(config.get('database', 'table')),
+        'table': validate_table_name(
+            config.get('database', 'table', fallback='TempHumid'),
+        ),
         'username': config.get('database', 'username'),
         'password': config.get('database', 'password'),
         'sql_retries': config.getint('database', 'sql_retries'),
