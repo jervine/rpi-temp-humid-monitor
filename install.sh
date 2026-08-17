@@ -27,6 +27,10 @@ APT_PACKAGES=(
     python3-venv
     python3-dev
     python3-pip
+    python3-setuptools
+    swig
+    unzip
+    wget
     default-libmysqlclient-dev
     build-essential
 )
@@ -158,6 +162,55 @@ install_apt_deps() {
     DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing[@]}"
 }
 
+install_optional_lgpio_packages() {
+    local pkg
+    local available=()
+
+    for pkg in python3-lgpio liblgpio1 liblgpio-dev; do
+        if apt-cache show "$pkg" >/dev/null 2>&1; then
+            available+=("$pkg")
+        fi
+    done
+
+    if ((${#available[@]} == 0)); then
+        log "No apt lgpio packages in this distro (normal on Bookworm)"
+        return
+    fi
+
+    log "Installing apt lgpio packages: ${available[*]}"
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "${available[@]}"
+}
+
+liblgpio_present() {
+    ldconfig -p 2>/dev/null | grep -q 'liblgpio\.so\.1'
+}
+
+install_liblgpio_from_source() {
+    local builddir
+
+    if liblgpio_present; then
+        log "liblgpio.so.1 already present"
+        return
+    fi
+
+    log "Building liblgpio from source (https://github.com/joan2937/lg)"
+    builddir="$(mktemp -d)"
+    (
+        cd "$builddir"
+        wget -q -O lg.zip https://github.com/joan2937/lg/archive/master.zip
+        unzip -q lg.zip
+        cd lg-master
+        make
+        make install
+    )
+    rm -rf "$builddir"
+    ldconfig
+
+    if ! liblgpio_present; then
+        die "liblgpio.so.1 is still missing after building joan2937/lg"
+    fi
+}
+
 remove_legacy_install() {
     if [[ -d "$LEGACY_DIR" ]]; then
         log "Removing legacy install directory ${LEGACY_DIR}"
@@ -194,15 +247,41 @@ install_app_files() {
 create_venv() {
     local venv_python="${INSTALL_ROOT}/venv/bin/python"
     local venv_pip="${INSTALL_ROOT}/venv/bin/pip"
+    local pyvenv_cfg="${INSTALL_ROOT}/venv/pyvenv.cfg"
 
     log "Creating Python virtual environment"
     if [[ ! -x "$venv_python" ]]; then
         python3 -m venv "${INSTALL_ROOT}/venv"
     fi
 
+    # apt python3-lgpio lives in system dist-packages; the venv must see it
+    # if pip cannot build Joan's lgpio module.
+    if [[ -f "$pyvenv_cfg" ]]; then
+        sed -i 's/^include-system-site-packages = .*/include-system-site-packages = true/' "$pyvenv_cfg"
+    fi
+
+    # Also expose apt dist-packages via a .pth so lgpio imports even if the
+    # venv was originally created without system site packages.
+    local pyver
+    pyver="$("$venv_python" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+    local site_packages="${INSTALL_ROOT}/venv/lib/python${pyver}/site-packages"
+    if [[ -d "$site_packages" ]]; then
+        printf '%s\n' '/usr/lib/python3/dist-packages' >"${site_packages}/system-dist-packages.pth"
+    fi
+
     log "Installing Python dependencies into venv"
     "$venv_pip" install --upgrade pip
     "$venv_pip" install -r "${PYTHON_CODE}/requirements.txt"
+
+    if ! "$venv_python" -c 'import lgpio' >/dev/null 2>&1; then
+        log "lgpio not importable yet; retrying pip install"
+        "$venv_pip" install lgpio || true
+    fi
+    if "$venv_python" -c 'import lgpio' >/dev/null 2>&1; then
+        log "lgpio is available"
+    else
+        log "WARNING: lgpio is not importable; DHT reads will fall back to Adafruit bitbang"
+    fi
 }
 
 install_config() {
@@ -296,6 +375,8 @@ do_install() {
     [[ -d "$PYTHON_CODE" ]] || die "Missing python_code directory: ${PYTHON_CODE}"
 
     install_apt_deps
+    install_optional_lgpio_packages
+    install_liblgpio_from_source
     remove_legacy_install
     install_app_files
     create_venv
@@ -330,18 +411,20 @@ Installation complete.
 
 Next steps:
   1. Edit ${CONFIG_FILE} (GPIO pin, MySQL credentials, limits).
-  2. Ensure the configured table (default: bedRoomTempHumid) exists in your MySQL database.
+  2. If the DHT data wire is on GPIO 4 (physical pin 7), disable 1-Wire
+     (raspi-config → Interface Options → 1-Wire) and reboot.
+  3. Ensure the configured table (default: bedRoomTempHumid) exists in your MySQL database.
 EOF
 
     if [[ "$RUN_MODE" == "systemd" ]]; then
         cat <<EOF
-  3. Check service status: systemctl status thmonitor
-  4. Follow logs: tail -f ${LOG_FILE}
+  4. Check service status: systemctl status thmonitor
+  5. Follow logs: tail -f ${LOG_FILE}
 EOF
     else
         cat <<EOF
-  3. Cron runs ${BIN_SINGLE} every minute.
-  4. Follow logs: tail -f ${LOG_FILE}
+  4. Cron runs ${BIN_SINGLE} every minute.
+  5. Follow logs: tail -f ${LOG_FILE}
 EOF
     fi
 }

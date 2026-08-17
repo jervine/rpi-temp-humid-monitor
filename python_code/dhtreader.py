@@ -43,8 +43,9 @@ def close():
 
     if _chip is not None:
         try:
-            import lgpio
-            lgpio.gpiochip_close(_chip)
+            lgpio = _import_lgpio()
+            if lgpio is not None:
+                lgpio.gpiochip_close(_chip)
         except Exception:
             pass
         _chip = None
@@ -93,11 +94,44 @@ def _warn_if_one_wire_conflict(pin):
     if _one_wire_warned or pin != 4:
         return
     if os.path.isdir('/sys/bus/w1/devices'):
-        logging.warning(
-            '1-Wire appears enabled; GPIO 4 is the default 1-Wire pin '
-            'and will conflict with a DHT data wire on physical pin 7'
+        logging.error(
+            '1-Wire is enabled and PIN is 4 (physical pin 7). '
+            'The kernel owns GPIO 4, so the DHT sensor cannot be read. '
+            'Disable 1-Wire (raspi-config → Interface Options → 1-Wire) and reboot, '
+            'or move the data wire and set PIN to that BCM GPIO.'
         )
         _one_wire_warned = True
+
+
+def _import_lgpio():
+    """Import lgpio, including the Raspberry Pi OS system package if needed."""
+    try:
+        import lgpio
+        return lgpio
+    except ImportError:
+        pass
+
+    import glob
+    import sys
+
+    extra_paths = ['/usr/lib/python3/dist-packages']
+    extra_paths.extend(sorted(glob.glob('/usr/lib/python3.*/dist-packages')))
+    for path in extra_paths:
+        if os.path.isdir(path) and path not in sys.path:
+            sys.path.append(path)
+
+    try:
+        import lgpio
+        logging.info('Loaded lgpio from system dist-packages')
+        return lgpio
+    except ImportError as err:
+        logging.warning(
+            'lgpio is not installed (%s). On Bookworm install liblgpio from '
+            'https://github.com/joan2937/lg (wget the zip, make, sudo make install, '
+            'sudo ldconfig). Trixie can use: sudo apt install python3-lgpio liblgpio1',
+            err,
+        )
+        return None
 
 
 def _open_gpiochip():
@@ -105,10 +139,8 @@ def _open_gpiochip():
     if _chip is not None:
         return _chip
 
-    try:
-        import lgpio
-    except ImportError:
-        logging.debug('lgpio is not installed')
+    lgpio = _import_lgpio()
+    if lgpio is None:
         return None
 
     last_err = None
@@ -228,7 +260,9 @@ class _LgpioDHT:
     """
 
     def __init__(self, chip, gpio, dev_type):
-        import lgpio as sbc
+        sbc = _import_lgpio()
+        if sbc is None:
+            raise ImportError('lgpio is not installed')
 
         self._sbc = sbc
         self._chip = chip
