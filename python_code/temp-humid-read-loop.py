@@ -29,11 +29,11 @@ def sensor_read(cfg, dev_type, dhtpin):
     for num in range(cfg['retries']):
         try:
             t, h = dhtreader.read(dev_type, dhtpin)
-        except Exception:
+        except Exception as err:
             if num + 1 < cfg['retries']:
                 logging.warning(
-                    'Exception during sensor read; retry %d/%d',
-                    num + 1, cfg['retries'],
+                    'Exception during sensor read; retry %d/%d: %s',
+                    num + 1, cfg['retries'], err,
                 )
                 time.sleep(cfg['timeout'])
             else:
@@ -43,7 +43,7 @@ def sensor_read(cfg, dev_type, dhtpin):
                 )
             continue
 
-        if not t or not h:
+        if t is None or h is None:
             logging.warning('Sensor returned empty reading; retrying.')
             if num + 1 < cfg['retries']:
                 time.sleep(cfg['timeout'])

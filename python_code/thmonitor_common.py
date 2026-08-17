@@ -103,7 +103,7 @@ def validate_pin(pin):
     if dhtpin <= 0:
         logging.warning('Invalid GPIO pin number: %s', pin)
         sys.exit(3)
-    logging.info('using pin #%d', dhtpin)
+    logging.info('using BCM GPIO pin #%d', dhtpin)
     return dhtpin
 
 
