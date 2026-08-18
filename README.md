@@ -35,6 +35,15 @@ sudo systemctl status thmonitor
 sudo systemctl restart thmonitor
 tail -f /var/log/th-python.log
 thmonitor-single    # one-off read (uses venv)
+thmonitor-smoke --pin 4   # smoke test: read sensor, print values (no MySQL)
+```
+
+Smoke test from a repo clone without a full install (uses the same venv/deps as the monitor, not a separate one):
+
+```bash
+python3 -m venv python_code/.venv
+python_code/.venv/bin/pip install -r python_code/requirements.txt
+python_code/.venv/bin/python python_code/smoke-test-sensor.py --pin 4
 ```
 
 Cron-based single-shot mode instead of the loop daemon:

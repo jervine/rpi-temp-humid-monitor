@@ -13,6 +13,7 @@ CONFIG_FILE="${CONFIG_FILE:-/etc/thMonitor.conf}"
 LOG_FILE="${LOG_FILE:-/var/log/th-python.log}"
 BIN_SINGLE="${BIN_SINGLE:-/usr/local/bin/thmonitor-single}"
 BIN_LOOP="${BIN_LOOP:-/usr/local/bin/thmonitor-loop}"
+BIN_SMOKE="${BIN_SMOKE:-/usr/local/bin/thmonitor-smoke}"
 SYSTEMD_UNIT="${SYSTEMD_UNIT:-/etc/systemd/system/thmonitor.service}"
 CRON_FILE="${CRON_FILE:-/etc/cron.d/thmonitor}"
 LEGACY_DIR="/usr/local/bin/thMonitor"
@@ -38,6 +39,7 @@ APT_PACKAGES=(
 PYTHON_MODULES=(
     dhtreader.py
     readMysql.py
+    smoke-test-sensor.py
     temp-humid-read-loop.py
     temp-humid-read-single.py
     thmonitor_common.py
@@ -310,7 +312,11 @@ EOF
 #!/bin/sh
 exec "${venv_python}" "${INSTALL_ROOT}/temp-humid-read-loop.py" "\$@"
 EOF
-    chmod 755 "$BIN_SINGLE" "$BIN_LOOP"
+    cat >"$BIN_SMOKE" <<EOF
+#!/bin/sh
+exec "${venv_python}" "${INSTALL_ROOT}/smoke-test-sensor.py" "\$@"
+EOF
+    chmod 755 "$BIN_SINGLE" "$BIN_LOOP" "$BIN_SMOKE"
 }
 
 install_systemd_service() {
@@ -408,6 +414,7 @@ Installation complete.
   Log file      : ${LOG_FILE}
   Run once      : ${BIN_SINGLE}
   Run loop      : ${BIN_LOOP}
+  Smoke test    : ${BIN_SMOKE}
 
 Next steps:
   1. Edit ${CONFIG_FILE} (GPIO pin, MySQL credentials, limits).
@@ -435,7 +442,7 @@ do_uninstall() {
     log "Uninstalling thmonitor"
     disable_systemd_service
     remove_cron_job
-    rm -f "$SYSTEMD_UNIT" "$BIN_SINGLE" "$BIN_LOOP"
+    rm -f "$SYSTEMD_UNIT" "$BIN_SINGLE" "$BIN_LOOP" "$BIN_SMOKE"
     rm -rf "$INSTALL_ROOT"
     remove_legacy_install
 
@@ -452,6 +459,7 @@ Removed:
   ${SYSTEMD_UNIT}
   ${BIN_SINGLE}
   ${BIN_LOOP}
+  ${BIN_SMOKE}
   ${CRON_FILE}
 
 Kept (not removed):

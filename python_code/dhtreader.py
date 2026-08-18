@@ -197,6 +197,8 @@ def _read_lgpio(dev_type, pin):
         _timestamp, _gpio, status, temperature, humidity = sensor.read()
     except Exception as err:
         logging.warning('lgpio DHT read failed: %s', err)
+        if 'busy' in str(err).lower():
+            _drop_lgpio_sensor(dev_type, pin)
         return None, None
 
     if status != _DHT_GOOD:
@@ -207,6 +209,17 @@ def _read_lgpio(dev_type, pin):
         return None, None
 
     return float(temperature), float(humidity)
+
+
+def _drop_lgpio_sensor(dev_type, pin):
+    """Release a cached lgpio sensor so the next read can reclaim the GPIO line."""
+    key = (dev_type, pin)
+    sensor = _sensors.pop(key, None)
+    if sensor is not None:
+        try:
+            sensor.cancel()
+        except Exception:
+            pass
 
 
 def _get_lgpio_sensor(dev_type, pin):

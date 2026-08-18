@@ -1,11 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Smoke test: read the DHT sensor once and print temperature and humidity."""
+"""Smoke test: read the DHT sensor once and print temperature and humidity.
+
+Uses the same Python dependencies as the monitor (adafruit-circuitpython-dht,
+lgpio, etc.). Do not create a separate venv for this script.
+
+After install:
+  thmonitor-smoke --pin 4
+
+From a repo clone (one-time venv setup):
+  python3 -m venv python_code/.venv
+  python_code/.venv/bin/pip install -r python_code/requirements.txt
+  python_code/.venv/bin/python python_code/smoke-test-sensor.py --pin 4
+"""
 
 import argparse
 import configparser
 import logging
 import os
+import shutil
+import subprocess
 import sys
 import time
 
@@ -22,6 +36,12 @@ def parse_args():
             'Read the DHT sensor once and print temperature and humidity. '
             'Use --pin to override the GPIO pin from config.'
         ),
+        epilog=(
+            'Run with the monitor venv (thmonitor-smoke after install, or '
+            'python_code/.venv/bin/python after pip install -r requirements.txt). '
+            'System python3 will fail if adafruit_dht is not installed.'
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         '--pin',
@@ -102,6 +122,37 @@ def resolve_pin_and_type(args):
     return pin, hwtype, config_used
 
 
+def warn_if_gpio_may_be_busy(pin):
+    """Warn when another service is likely holding the configured GPIO line."""
+    if shutil.which('systemctl') is None:
+        return
+
+    try:
+        active = subprocess.run(
+            ['systemctl', 'is-active', '--quiet', 'thmonitor.service'],
+            check=False,
+        ).returncode == 0
+    except OSError:
+        return
+
+    if active:
+        print(
+            'WARNING: thmonitor.service is running and holds BCM GPIO '
+            f'{pin}. Stop it for a clean smoke test:\n'
+            '  sudo systemctl stop thmonitor\n'
+            'Reads may still succeed after retries if they land between '
+            'monitor cycles.',
+            file=sys.stderr,
+        )
+
+    if pin == 4 and os.path.isdir('/sys/bus/w1/devices'):
+        print(
+            'WARNING: 1-Wire is enabled on GPIO 4 (physical pin 7). '
+            'Disable it in raspi-config or use a different --pin.',
+            file=sys.stderr,
+        )
+
+
 def read_sensor(dev_type, pin, retries, timeout):
     """Read the sensor, retrying on failure. Returns (temp, humidity) or None."""
     for attempt in range(1, retries + 1):
@@ -147,6 +198,7 @@ def main():
         return 1
 
     dev_type = common.resolve_dht_type(hwtype)
+    warn_if_gpio_may_be_busy(pin)
 
     dhtreader.init()
     try:
