@@ -76,6 +76,11 @@ def parse_args():
         action='store_true',
         help='Show DHT backend log messages on stderr',
     )
+    parser.add_argument(
+        '--diagnose',
+        action='store_true',
+        help='Print GPIO contention checks and exit (no sensor read)',
+    )
     return parser.parse_args()
 
 
@@ -123,34 +128,78 @@ def resolve_pin_and_type(args):
 
 
 def warn_if_gpio_may_be_busy(pin):
-    """Warn when another service is likely holding the configured GPIO line."""
-    if shutil.which('systemctl') is None:
-        return
+    """Warn when something else is likely holding the configured GPIO line."""
+    issues = list(_gpio_contention_checks(pin))
+    for message in issues:
+        print(f'WARNING: {message}', file=sys.stderr)
 
-    try:
-        active = subprocess.run(
-            ['systemctl', 'is-active', '--quiet', 'thmonitor.service'],
-            check=False,
-        ).returncode == 0
-    except OSError:
-        return
 
-    if active:
-        print(
-            'WARNING: thmonitor.service is running and holds BCM GPIO '
-            f'{pin}. Stop it for a clean smoke test:\n'
-            '  sudo systemctl stop thmonitor\n'
-            'Reads may still succeed after retries if they land between '
-            'monitor cycles.',
-            file=sys.stderr,
+def _gpio_contention_checks(pin):
+    """Yield human-readable descriptions of likely GPIO conflicts."""
+    if shutil.which('systemctl') is not None:
+        try:
+            active = subprocess.run(
+                ['systemctl', 'is-active', '--quiet', 'thmonitor.service'],
+                check=False,
+            ).returncode == 0
+        except OSError:
+            active = False
+        if active:
+            yield (
+                'thmonitor.service is running (stop with: sudo systemctl stop thmonitor)'
+            )
+
+    cron_file = '/etc/cron.d/thmonitor'
+    if os.path.isfile(cron_file):
+        yield (
+            f'{cron_file} exists and may run thmonitor-single every minute '
+            '(disable cron or wait between runs)'
         )
 
     if pin == 4 and os.path.isdir('/sys/bus/w1/devices'):
-        print(
-            'WARNING: 1-Wire is enabled on GPIO 4 (physical pin 7). '
-            'Disable it in raspi-config or use a different --pin.',
-            file=sys.stderr,
+        yield (
+            '1-Wire is enabled; the kernel owns GPIO 4 (physical pin 7). '
+            'Disable 1-Wire in raspi-config or move the sensor to another pin'
         )
+
+    if shutil.which('pgrep') is not None:
+        try:
+            result = subprocess.run(
+                ['pgrep', '-af', r'temp-humid-read|thmonitor'],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            result = None
+        if result and result.stdout.strip():
+            for line in result.stdout.strip().splitlines():
+                if 'smoke-test-sensor' not in line:
+                    yield f'another monitor process may be running: {line.strip()}'
+
+
+def diagnose_gpio(pin):
+    """Print GPIO diagnostics and return the number of issues found."""
+    print(f'GPIO diagnostics for BCM pin {pin}:')
+    issues = list(_gpio_contention_checks(pin))
+    if issues:
+        for message in issues:
+            print(f'  ! {message}')
+    else:
+        print('  - no obvious software conflicts (systemd/cron/1-Wire/monitor processes)')
+
+    line_info = dhtreader.describe_gpio_line(pin)
+    if line_info:
+        print(f'  - {line_info}')
+    else:
+        print('  - lgpio line info unavailable (lgpio not installed or no gpiochip)')
+
+    print(
+        '\nDHT sensors need exclusive access to the data pin for ~1 s per read. '
+        'Timeouts on early attempts are normal; GPIO busy usually means the kernel '
+        'or another process owns the line.'
+    )
+    return len(issues)
 
 
 def read_sensor(dev_type, pin, retries, timeout):
@@ -198,6 +247,14 @@ def main():
         return 1
 
     dev_type = common.resolve_dht_type(hwtype)
+
+    if args.diagnose:
+        dhtreader.init()
+        try:
+            return 1 if diagnose_gpio(pin) else 0
+        finally:
+            dhtreader.close()
+
     warn_if_gpio_may_be_busy(pin)
 
     dhtreader.init()

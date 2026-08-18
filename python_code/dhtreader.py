@@ -191,6 +191,45 @@ def _chip_label(lgpio, handle):
     return f'{name} {label}'.strip()
 
 
+def describe_gpio_line(pin):
+    """
+    Return diagnostic text for a BCM GPIO line, or None if lgpio is unavailable.
+
+    Useful to see whether the kernel or another consumer already owns the pin.
+    """
+    lgpio = _import_lgpio()
+    chip = _open_gpiochip()
+    if lgpio is None or chip is None:
+        return None
+
+    try:
+        info = lgpio.gpio_get_line_info(chip, pin)
+    except Exception as err:
+        return f'BCM GPIO {pin}: unable to query line info ({err})'
+
+    if isinstance(info, (tuple, list)):
+        parts = list(info)
+    else:
+        parts = [
+            getattr(info, 'ok', ''),
+            getattr(info, 'offset', pin),
+            getattr(info, 'flags', ''),
+            getattr(info, 'name', ''),
+            getattr(info, 'consumer', '') or getattr(info, 'user', ''),
+        ]
+
+    while len(parts) < 5:
+        parts.append('')
+
+    _ok, offset, flags, name, consumer = parts[:5]
+    name = name or '(unnamed)'
+    consumer = consumer or '(none)'
+    return (
+        f'BCM GPIO {offset} on chip handle {chip}: '
+        f'name={name!r} consumer={consumer!r} flags={flags}'
+    )
+
+
 def _read_lgpio(dev_type, pin):
     try:
         sensor = _get_lgpio_sensor(dev_type, pin)
@@ -354,16 +393,35 @@ class _LgpioDHT:
 
     def _trigger(self):
         sbc = self._sbc
-        sbc.gpio_claim_output(self._chip, self._gpio, 0)
+        chip, gpio = self._chip, self._gpio
+        self._claim_output(chip, gpio)
         time.sleep(0.001 if self._dhtxx else 0.015)
         self._bits = 0
         self._code = 0
-        sbc.gpio_claim_alert(self._chip, self._gpio, sbc.RISING_EDGE)
+        sbc.gpio_claim_alert(chip, gpio, sbc.RISING_EDGE)
+
+    def _claim_output(self, chip, gpio):
+        """Claim GPIO as output for the DHT start pulse, freeing our line first if needed."""
+        sbc = self._sbc
+        try:
+            sbc.gpio_claim_output(chip, gpio, 0)
+        except Exception as err:
+            if 'busy' not in str(err).lower():
+                raise
+            try:
+                sbc.gpio_free(chip, gpio)
+            except Exception:
+                pass
+            sbc.gpio_claim_output(chip, gpio, 0)
 
     def cancel(self):
         if self._cb is not None:
             self._cb.cancel()
             self._cb = None
+        try:
+            self._sbc.gpio_free(self._chip, self._gpio)
+        except Exception:
+            pass
 
     def read(self):
         self._new_data = False
