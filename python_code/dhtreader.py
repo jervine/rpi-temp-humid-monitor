@@ -22,6 +22,7 @@ _chip = None
 _sensors = {}
 _adafruit_devices = {}
 _backend = None
+_forced_backend = None
 _one_wire_warned = False
 
 
@@ -30,9 +31,26 @@ def init():
     return None
 
 
+def set_backend(name='auto'):
+    """
+    Force the read backend ('lgpio', 'adafruit') or 'auto' to pick at runtime.
+
+    Call before read(); reset with set_backend('auto').
+    """
+    global _forced_backend, _backend
+    if name in (None, 'auto'):
+        _forced_backend = None
+        _backend = None
+        return
+    if name not in ('lgpio', 'adafruit'):
+        raise ValueError(f'unsupported DHT backend: {name!r}')
+    _forced_backend = name
+    _backend = name
+
+
 def close():
     """Release cached DHT devices and their GPIO lines."""
-    global _chip, _backend, _one_wire_warned
+    global _chip, _backend, _forced_backend, _one_wire_warned
 
     for sensor in _sensors.values():
         try:
@@ -57,6 +75,7 @@ def close():
             pass
     _adafruit_devices.clear()
     _backend = None
+    _forced_backend = None
     _one_wire_warned = False
 
 
@@ -66,16 +85,33 @@ def read(dev_type, pin):
 
     Returns (temperature, humidity) on success, or (None, None) on failure.
     """
+    details = read_details(dev_type, pin)
+    if details['status'] != _DHT_GOOD:
+        return None, None
+    return details['temperature'], details['humidity']
+
+
+def read_details(dev_type, pin):
+    """
+    Read the sensor and return decoded values plus diagnostic metadata.
+
+    Returns a dict with keys: temperature, humidity, status, status_name, backend,
+    and raw (lgpio frame bytes when available).
+    """
     pin = int(pin)
     _warn_if_one_wire_conflict(pin)
     backend = _select_backend()
     if backend == 'lgpio':
-        return _read_lgpio(dev_type, pin)
-    return _read_adafruit(dev_type, pin)
+        return _read_lgpio_details(dev_type, pin)
+    return _read_adafruit_details(dev_type, pin)
 
 
 def _select_backend():
     global _backend
+    if _forced_backend:
+        _backend = _forced_backend
+        logging.info('DHT backend: %s (forced)', _backend)
+        return _backend
     if _backend:
         return _backend
 
@@ -230,7 +266,7 @@ def describe_gpio_line(pin):
     )
 
 
-def _read_lgpio(dev_type, pin):
+def _read_lgpio_details(dev_type, pin):
     try:
         sensor = _get_lgpio_sensor(dev_type, pin)
         _timestamp, _gpio, status, temperature, humidity = sensor.read()
@@ -238,16 +274,73 @@ def _read_lgpio(dev_type, pin):
         logging.warning('lgpio DHT read failed: %s', err)
         if 'busy' in str(err).lower():
             _drop_lgpio_sensor(dev_type, pin)
-        return None, None
+        return _details_result('lgpio', status=_DHT_TIMEOUT, raw=None)
 
     if status != _DHT_GOOD:
         logging.warning(
             'DHT read failed (%s) on BCM GPIO %d',
             _STATUS_NAMES.get(status, status), pin,
         )
-        return None, None
+        return _details_result(
+            'lgpio',
+            status=status,
+            temperature=temperature,
+            humidity=humidity,
+            raw=getattr(sensor, 'last_raw', None),
+        )
 
-    return float(temperature), float(humidity)
+    return _details_result(
+        'lgpio',
+        status=status,
+        temperature=float(temperature),
+        humidity=float(humidity),
+        raw=getattr(sensor, 'last_raw', None),
+    )
+
+
+def _read_adafruit_details(dev_type, pin):
+    device = _get_adafruit_device(dev_type, pin)
+    try:
+        temperature = device.temperature
+        humidity = device.humidity
+    except RuntimeError as err:
+        logging.warning('DHT read failed: %s', err)
+        return _details_result('adafruit', status=_DHT_TIMEOUT)
+
+    if temperature is None or humidity is None:
+        logging.warning('DHT returned no temperature/humidity values')
+        return _details_result('adafruit', status=_DHT_TIMEOUT)
+
+    return _details_result(
+        'adafruit',
+        status=_DHT_GOOD,
+        temperature=float(temperature),
+        humidity=float(humidity),
+    )
+
+
+def _details_result(
+    backend,
+    status=_DHT_TIMEOUT,
+    temperature=None,
+    humidity=None,
+    raw=None,
+):
+    return {
+        'backend': backend,
+        'status': status,
+        'status_name': _STATUS_NAMES.get(status, str(status)),
+        'temperature': temperature,
+        'humidity': humidity,
+        'raw': raw,
+    }
+
+
+def _read_lgpio(dev_type, pin):
+    details = _read_lgpio_details(dev_type, pin)
+    if details['status'] != _DHT_GOOD:
+        return None, None
+    return details['temperature'], details['humidity']
 
 
 def _drop_lgpio_sensor(dev_type, pin):
@@ -269,19 +362,10 @@ def _get_lgpio_sensor(dev_type, pin):
 
 
 def _read_adafruit(dev_type, pin):
-    device = _get_adafruit_device(dev_type, pin)
-    try:
-        temperature = device.temperature
-        humidity = device.humidity
-    except RuntimeError as err:
-        logging.warning('DHT read failed: %s', err)
+    details = _read_adafruit_details(dev_type, pin)
+    if details['status'] != _DHT_GOOD:
         return None, None
-
-    if temperature is None or humidity is None:
-        logging.warning('DHT returned no temperature/humidity values')
-        return None, None
-
-    return float(temperature), float(humidity)
+    return details['temperature'], details['humidity']
 
 
 def _get_adafruit_device(dev_type, pin):
@@ -328,6 +412,7 @@ class _LgpioDHT:
         self._status = _DHT_TIMEOUT
         self._temperature = 0.0
         self._humidity = 0.0
+        self.last_raw = None
         sbc.gpio_set_watchdog_micros(chip, gpio, 1000)
         self._cb = sbc.callback(chip, gpio, sbc.RISING_EDGE, self._rising_edge)
 
@@ -356,6 +441,14 @@ class _LgpioDHT:
         b2 = (self._code >> 16) & 0xff
         b3 = (self._code >> 24) & 0xff
         b4 = (self._code >> 32) & 0xff
+        self.last_raw = {
+            'bits': self._bits,
+            'checksum': checksum,
+            'rh_msb': b4,
+            'rh_lsb': b3,
+            't_msb': b2,
+            't_lsb': b1,
+        }
 
         if ((b1 + b2 + b3 + b4) & 0xFF) != checksum:
             self._status = _DHT_BAD_CHECKSUM
@@ -388,17 +481,20 @@ class _LgpioDHT:
                 if edge_len > 1e5:
                     self._code |= 1
                 self._bits += 1
-        elif self._bits >= 30:
+        elif self._bits >= 40:
             self._decode()
 
     def _trigger(self):
         sbc = self._sbc
         chip, gpio = self._chip, self._gpio
         self._claim_output(chip, gpio)
-        time.sleep(0.001 if self._dhtxx else 0.015)
+        # DHT22/AM2302: pigpio uses ~18 ms; DHT11 needs ~18 ms per datasheet.
+        time.sleep(0.018 if self._dhtxx else 0.015)
         self._bits = 0
         self._code = 0
-        sbc.gpio_claim_alert(chip, gpio, sbc.RISING_EDGE)
+        self._last_edge_tick = 0
+        pull_up = getattr(sbc, 'SET_PULL_UP', 0)
+        sbc.gpio_claim_alert(chip, gpio, sbc.RISING_EDGE, pull_up)
 
     def _claim_output(self, chip, gpio):
         """Claim GPIO as output for the DHT start pulse, freeing our line first if needed."""

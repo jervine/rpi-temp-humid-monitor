@@ -68,8 +68,19 @@ def parse_args():
     parser.add_argument(
         '--timeout',
         type=float,
-        default=2.0,
-        help='Seconds to wait between retries (default: 2.0)',
+        default=3.0,
+        help='Seconds to wait between retries (default: 3.0; DHT22 needs >=2 s)',
+    )
+    parser.add_argument(
+        '--backend',
+        choices=['auto', 'lgpio', 'adafruit'],
+        default='auto',
+        help='DHT read backend (default: auto; use adafruit to compare against lgpio)',
+    )
+    parser.add_argument(
+        '--raw',
+        action='store_true',
+        help='Print decoded frame bytes from the lgpio backend when available',
     )
     parser.add_argument(
         '-v', '--verbose',
@@ -202,11 +213,25 @@ def diagnose_gpio(pin):
     return len(issues)
 
 
-def read_sensor(dev_type, pin, retries, timeout):
-    """Read the sensor, retrying on failure. Returns (temp, humidity) or None."""
+def format_raw(raw):
+    """Format lgpio raw frame bytes for human-readable output."""
+    if not raw:
+        return None
+    rh_raw = (raw['rh_msb'] << 8) + raw['rh_lsb']
+    return (
+        f"bits={raw['bits']} "
+        f"RH={raw['rh_msb']:02x}/{raw['rh_lsb']:02x} ({rh_raw/10:.1f} %) "
+        f"T={raw['t_msb']:02x}/{raw['t_lsb']:02x} "
+        f"checksum={raw['checksum']:02x}"
+    )
+
+
+def read_sensor(dev_type, pin, retries, timeout, show_raw=False):
+    """Read the sensor, retrying on failure. Returns details dict or None."""
+    last_details = None
     for attempt in range(1, retries + 1):
         try:
-            temperature, humidity = dhtreader.read(dev_type, pin)
+            details = dhtreader.read_details(dev_type, pin)
         except Exception as err:
             if attempt < retries:
                 print(
@@ -218,17 +243,28 @@ def read_sensor(dev_type, pin, retries, timeout):
             print(f'ERROR: sensor read failed: {err}', file=sys.stderr)
             return None
 
-        if temperature is not None and humidity is not None:
-            return temperature, humidity
+        last_details = details
+        if show_raw and details.get('raw'):
+            print(f"Raw frame: {format_raw(details['raw'])}", file=sys.stderr)
+
+        if details['status_name'] == 'good':
+            return details
 
         if attempt < retries:
             print(
-                f'Empty reading (attempt {attempt}/{retries}); retrying...',
+                f"Read status {details['status_name']} "
+                f'(attempt {attempt}/{retries}); retrying...',
                 file=sys.stderr,
             )
             time.sleep(timeout)
 
-    print(f'ERROR: no valid reading after {retries} attempts', file=sys.stderr)
+    if last_details:
+        print(
+            f"ERROR: last read status was {last_details['status_name']}",
+            file=sys.stderr,
+        )
+    else:
+        print(f'ERROR: no valid reading after {retries} attempts', file=sys.stderr)
     return None
 
 
@@ -247,6 +283,7 @@ def main():
         return 1
 
     dev_type = common.resolve_dht_type(hwtype)
+    dhtreader.set_backend(args.backend)
 
     if args.diagnose:
         dhtreader.init()
@@ -259,16 +296,29 @@ def main():
 
     dhtreader.init()
     try:
-        result = read_sensor(dev_type, pin, args.retries, args.timeout)
+        result = read_sensor(
+            dev_type, pin, args.retries, args.timeout, show_raw=args.raw,
+        )
         if result is None:
             return 1
 
-        temperature, humidity = result
+        temperature = result['temperature']
+        humidity = result['humidity']
         print(f'Temperature: {temperature:.1f} C')
         print(f'Humidity: {humidity:.1f} %')
         print(f'GPIO pin: {pin} (BCM)')
+        print(f"Backend: {result['backend']}")
         if config_used:
             print(f'Config: {config_used}')
+        if args.raw and result.get('raw'):
+            print(f"Raw frame: {format_raw(result['raw'])}")
+        if humidity >= 99.9:
+            print(
+                'NOTE: 99.9 % is the DHT22 maximum and often means the humidity '
+                'element is saturated or the sensor needs a power cycle. Try '
+                '--backend adafruit to compare, or power-cycle the sensor.',
+                file=sys.stderr,
+            )
         return 0
     finally:
         dhtreader.close()
